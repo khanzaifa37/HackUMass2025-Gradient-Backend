@@ -25,6 +25,56 @@ def setup_auth():
     except Exception as e:
         print(f"An error occurred during authentication setup: {e}")
         sys.exit(1)
+def grade_student_answer(rubric_text: str, student_answer: str, model_name: str = "gemini-1.5-pro-latest"):
+    """
+    Grades a student's multi-question answer based on a multi-question rubric.
+    Returns structured JSON with per-question scoring and improvement suggestions.
+    """
+
+    model = genai.GenerativeModel(model_name=model_name)
+
+    grading_prompt = f"""
+    You are an expert teacher grading a student's submission.
+
+    Rubric (each question's grading criteria):
+    {rubric_text}
+
+    Student's Answers:
+    {student_answer}
+
+    ---
+    TASK:
+    1. Identify each question number (like 1.a, 1.b, etc.).
+    2. For each question, use the rubric to decide a numeric score.
+    3. Provide a short reason for why that score fits the rubric.
+    4. Suggest how the student can improve.
+
+    Only use numeric scores listed in the rubric. Do not invent new scales.
+
+    OUTPUT FORMAT:
+    {{
+      "results": [
+        {{
+          "question": "1.a",
+          "score": <number>,
+          "reason": "<reason based on rubric>",
+          "improvement": "<how to improve>"
+        }},
+        ...
+      ],
+      "overall_feedback": "<overall comment summarizing performance>"
+    }}
+    """
+
+    response = model.generate_content(
+        grading_prompt,
+        generation_config=types.GenerationConfig(
+            temperature=0.1,
+            max_output_tokens=1000
+        )
+    )
+
+    return response.text
 
 def transcribe_pdf_from_path(pdf_path: str, model_name: str = "gemini-2.5-flash"):
     """

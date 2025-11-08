@@ -1,0 +1,155 @@
+Question: 1] We know $\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|! (n-|S|-1)!}{n!} [v(S \cup \{i\}) - v(S)]$
+When $i$ joins $S$, edges $\{i, j\}$, ($j \in S$) get activated.
+Hence $v(S \cup \{i\}) - v(S) = \sum_{j \in S} w(i, j)$.
+$\therefore \phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|! (n-|S|-1)!}{n!} \sum_{j \in S} w(i, j)$.
+Each subset $S$ that contains $j$ but not $i$ can be written as $S = T \cup \{j\}$, where $T \subseteq N \setminus \{i, j\}$.
+$\therefore |S| = |T|+1$
+$\therefore \frac{|S|! (n-|S|-1)!}{n!} = \frac{(|T|+1)! (n-|T|-2)!}{n!}$
+Number of subsets $T$ of size $k = \binom{n-2}{k}$.
+$\therefore \frac{|S|! (n-|S|-1)!}{n!} = \sum_{k=0}^{n-2} \binom{n-2}{k} \frac{(k+1)! (n-k-2)!}{n!}$
+$= \frac{1}{n!} \sum_{k=0}^{n-2} \frac{(n-2)!}{k!(n-k-2)!} (k+1)! (n-k-2)!$
+$= \frac{1}{n!} \sum_{k=0}^{n-2} (n-2)! (k+1)$
+$= \frac{(n-2)!}{n!} \sum_{k=0}^{n-2} (k+1)$
+$= \frac{(n-2)!}{n!} \frac{(n-1)n}{2}$
+$= \frac{1}{n(n-1)} \frac{(n-1)n}{2}$
+$= \frac{1}{2}$
+$\phi_i(v) = \frac{1}{2} \sum_{e \in E_i} w(e)$.
+
+Question: 2] a) $x_1+x_2+x_3=1$
+$x_1+x_2 \ge 1$
+$x_2+x_3 \ge 1$
+$x_1+x_3 \ge 0$
+$x_i \ge 0$
+Since $x_1+x_2 \ge 1$ and $x_1+x_2+x_3=1$, we get $x_3 \le 0$. Since $x_3 \ge 0$, $x_3=0$.
+Since $x_2+x_3 \ge 1$ and $x_1+x_2+x_3=1$, we get $x_1 \le 0$. However $x_1 \ge 0$, $x_1=0$.
+Since $x_1+x_2+x_3=1$, $x_2=1$.
+Hence $(x_1, x_2, x_3) = (0,1,0)$.
+
+Question: $Q_i: \sum_{S \subseteq N \setminus \{i\}} \frac{|S|! (n-|S|-1)!}{n!} [v(S \cup \{i\}) - v(S)]$
+For $|S|=0$, $\frac{0!2!}{3!} = \frac{2}{6} = \frac{1}{3}$.
+For $|S|=1$, $\frac{1!1!}{3!} = \frac{1}{6}$.
+For $|S|=2$, $\frac{2!0!}{3!} = \frac{2}{6} = \frac{1}{3}$.
+
+For player 1,
+S | v(S) | v(S $\cup \{1\}$) | diff
+--|-------|-----------------|-----
+$\emptyset$ | 0 | 0 | 0
+$\{2\}$ | 0 | 1 | 1
+$\{3\}$ | 0 | 0 | 0
+$\{2,3\}$ | 1 | 1 | 0
+
+Answer: $\therefore \phi_1 = \frac{1}{3}(0) + \frac{1}{6}(1) + \frac{1}{6}(0) = \frac{1}{6}$.
+
+For player 2,
+S | v(S) | v(S $\cup \{2\}$) | diff
+--|-------|-----------------|-----
+$\emptyset$ | 0 | 0 | 0
+$\{1\}$ | 0 | 1 | 1
+$\{3\}$ | 0 | 0 | 0
+$\{1,3\}$ | 0 | 1 | 1
+
+Answer: $\therefore \phi_2 = \frac{1}{3}(0) + \frac{1}{6}(1+1) + \frac{1}{3}(1) = \frac{1}{3} + \frac{1}{3} = \frac{2}{3}$.
+
+For player 3,
+S | v(S) | v(S $\cup \{3\}$) | diff
+--|-------|-----------------|-----
+$\emptyset$ | 0 | 0 | 0
+$\{1\}$ | 0 | 0 | 0
+$\{2\}$ | 0 | 0 | 0
+$\{1,2\}$ | 0 | 1 | 1
+
+Answer: $\therefore \phi_3 = \frac{1}{3}(0) + \frac{1}{6}(1+0) + \frac{1}{3}(0) = \frac{1}{6}$.
+
+Answer: $\therefore \text{Shapley value} = (\frac{1}{6}, \frac{2}{3}, \frac{1}{6})$.
+
+Question: b) $W(1,2)=2, W(1,3)=2, W(1,4)=0, W(2,3)=3, W(3,4)=0$.
+$\phi_i = \frac{1}{2} \sum_{e \in E_i} w(e)$.
+Answer: $\therefore \phi_1 = \frac{1}{2}(W(1,2)+W(1,3)+W(1,4)) = \frac{1}{2}(2+2+0) = \frac{1}{2}(4) = 2$.
+$\phi_2 = \frac{1}{2}(W(1,2)+W(2,3)) = \frac{1}{2}(2+3) = \frac{1}{2}(5) = 2.5$.
+
+Answer: $\phi_3 = \frac{1}{2}(W(1,3)+W(2,3)+W(3,4)) = \frac{1}{2}(2+3+0) = \frac{1}{2}(5) = 2.5$.
+$\phi_4 = \frac{1}{2}(W(1,4)+W(3,4)) = \frac{1}{2}(0+0) = \frac{1}{2}(0) = 0$.
+$\therefore \text{Shapley value} = (2, 2.5, 2.5, 0)$.
+
+Question: $x_1+x_2+x_3+x_4=7$
+$x_1+x_2 \ge 2$
+$x_2+x_3 \ge 3$
+$x_1+x_3 \ge 2$
+We can see that the shapley vector satisfies these conditions.
+Hence core = shapley = $(2, 2.5, 2.5, 0)$.
+
+Question: c) Total value = $1+1+1+2+2+3 = 10$.
+Threshold = 5.
+We know a core exists if and only if there is a veto player.
+Player 1, 2, 3 are not veto players as a winning coalition exists without them (player 4 & player 6).
+Player 4 and 5 are not veto players as a winning coalition exists without them (player 1,2, and 6).
+Player 6 is not a veto player as a winning coalition exists without them (player 1,4, and 5).
+Thus core is empty.
+By law of symmetry, $\phi_1 = \phi_2 = \phi_3 = \phi_4$.
+
+Question: For coalition size $k$
+$(|S|-1)! (n-|S|-1)!$
+$k=1: 1!4! = 24$
+$k=2: 2!3! = 12$
+$k=3: 3!2! = 12$
+
+S | MWCs | Weighted Sum
+--|--------|---------------
+1 | 5 | $3 \times \text{size } 3, 2 \times \text{size } 4 \implies 3 \times 12 + 2 \times 12 = 60$
+4 | 5 | $1 \times \text{size } 2, 3 \times \text{size } 3, 1 \times \text{size } 4 = 24 + 3 \times 12 + 12 = 72$
+6 | 5 | $2 \times \text{size } 2, 3 \times \text{size } 3 = 48 + 36 = 84$
+
+$\phi_1 = \frac{60}{720} = \frac{1}{12}$.
+$\phi_4 = \frac{72}{720} = \frac{1}{10}$.
+$\phi_6 = \frac{84}{720} = \frac{7}{60}$.
+
+$\therefore \text{Shapley values}: (\frac{1}{12}, \frac{1}{12}, \frac{1}{12}, \frac{1}{10}, \frac{1}{10}, \frac{7}{60})$.
+
+Question: 3] a) No it is not necessary that a superadditive game has a non-empty core.
+eg. $v(1)=v(2)=v(3)=0, v(\{1,2\})=v(\{1,3\})=v(\{2,3\})=1, v(\{1,2,3\})=1$.
+$v(\{1,2,3\}) \ge v(\{1,2\}) + v(\{3\})$. Hence it is superadditive.
+
+Question: $x_1+x_2+x_3=1$
+$x_1+x_2 \ge 1, x_2+x_3 \ge 1, x_1+x_3 \ge 1$.
+$\therefore 2(x_1+x_2+x_3) \ge 3 \implies x_1+x_2+x_3 \ge 1.5$.
+Hence the core is empty.
+
+Question: b) In order to show this we need to prove $\alpha x + (1-\alpha)y$ satisfies both efficiency and rationality of coalition.
+$\sum \alpha x_i + (1-\alpha)y_i = \alpha \sum x_i + (1-\alpha) \sum y_i = \alpha V(N) + (1-\alpha)V(N) = V(N)$.
+Hence efficiency satisfied.
+For any $S$, As $x,y$ belong to the core,
+$\sum_{i \in S} \alpha x_i + (1-\alpha)y_i = \alpha \sum_{i \in S} x_i + (1-\alpha) \sum_{i \in S} y_i \ge \alpha v(S) + (1-\alpha)v(S) = v(S)$.
+Hence rationality of coalition is true.
+Thus if $x,y \in \text{core}(G)$, $\alpha x + (1-\alpha)y \in \text{core}$ as well.
+
+Question: c) The definition of dummy player $i$ is if $S \subseteq N$, $v(S \cup \{i\}) = v(S)$.
+$\therefore v(N) = v(N \setminus \{i\})$.
+We know that in the core, $\sum_{j \in N} x_j = v(N)$.
+$\sum_{j \in N \setminus \{i\}} x_j = v(N \setminus \{i\})$.
+$\therefore \sum_{j \in N} x_j = \sum_{j \in N \setminus \{i\}} x_j$.
+Substituting in (1), $x_i = 0$.
+$\therefore$ This is only possible if $x_i=0$.
+Hence the payoff for player $i$ is $0$.
+
+Question: 4] a) $\phi_i = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|! (n-|S|-1)!}{n!} [v(S \cup \{i\}) - v(S)]$.
+For coalitions, where $i$ is pivotal, $v(S \cup \{i\}) = c$ and $v(S) = 0$.
+$\therefore v(S \cup \{i\}) - v(S) = 1$.
+$\phi_i = \sum_{k=0}^{n-1} \sum_{S: |S|=k, S \in \text{Piv}_i(k)} \frac{k! (n-k-1)!}{n!} (1)$.
+$\phi_i = \sum_{k=0}^{n-1} \frac{k! (n-k-1)!}{n!} |\text{Piv}_i(k)|$.
+Since there are $\text{Piv}_i(k)$ such coalitions.
+
+Question: b) Since player $i$ is pivotal, $S \in \text{Piv}_i(k)$.
+$v(S \setminus \{i\}) < q$.
+By definition of pivotal we know that the coalition was not winning before $i$ joins and wins with $i$.
+$v(S \cup \{i\}) \ge q-1$.
+Since $i$ can only increase the coalition with its own weight,
+$v(S \cup \{i\}) + v(i) \ge q$.
+$\therefore v(S \cup \{i\}) = q-w_i$.
+$\therefore q-1 = v(S \cup \{i\}) = q-w_i$.
+
+Question: c) Let $A$ be the coalitions not containing player $j$.
+$A = \{S \subseteq \{1, ..., j-1\}\}$ where $|S|=k$, $\sum_{e \in S} w_e = r$.
+$A = x(k, r, j-1)$.
+
+Question: Let $B$ be the coalitions containing player $j$.
+$B = \{S \subseteq \{1, ..., j\}
