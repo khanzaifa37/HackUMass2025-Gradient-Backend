@@ -8,6 +8,7 @@ import sys
 import time
 import google.generativeai as genai
 from google.generativeai import types
+import uuid
 
 def setup_auth():
     """Sets up authentication for the Gemini API by checking for an env var."""
@@ -150,3 +151,24 @@ if __name__ == "__main__":
     print("\n" + "="*30)
     print("=== TRANSCRIPTION END ===")
     print("="*30)
+
+    if not result.startswith("Error:"):
+        try:
+            # Create a unique filename based on your request
+            unique_id = str(uuid.uuid4())
+            base_name = os.path.basename(pdf_path)
+            name_without_ext = os.path.splitext(base_name)[0]
+            
+            # Format: [UUID]_[input_filename_no_ext]_output.txt
+            output_filename = f"{unique_id}_{name_without_ext}_output.txt"
+            
+            with open(output_filename, "w", encoding="utf-8") as f:
+                f.write(result)
+            
+            print(f"\nSuccessfully saved transcription to: {output_filename}")
+        
+        except Exception as e:
+            print(f"\nError saving transcription to file: {e}")
+    else:
+        print("\nTranscription failed. Output file was not created.")
+    # -------------------------------
