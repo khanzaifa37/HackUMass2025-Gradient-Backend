@@ -26,30 +26,18 @@ def setup_auth():
         print(f"An error occurred during authentication setup: {e}")
         sys.exit(1)
 
-def transcribe_pdf_from_path(pdf_path: str, model_name: str = "gemini-2.5-flash"):
+def transcribe_pdf_from_path(pdf_path: str, system_prompt: str, model_name: str = "gemini-2.5-flash", ):
     """
     Transcribes a PDF file using the Gemini API, handling file upload and cleanup.
     
     Args:
         pdf_path: The local path to the PDF file.
+        system_prompt: Accept prompt which is related to the input document and helps guide the transcription.
         model_name: The Gemini model to use (e.g., 'gemini-1.5-flash-latest').
 
     Returns:
         The transcribed text as a string, or an error message.
     """
-    
-    # Define the system prompt first.
-    # We will pass this to the model to guide its transcription.
-    system_prompt = (
-        "You are an expert transcriptionist specializing in handwritten documents."
-        "Transcribe the attached PDF, which contains handwritten questions and answers."
-        "Your task is to produce a clean, plain-text version of the content."
-        "Follow these rules precisely:"
-        "1. Preserve the question and answer (Q&A) format."
-        "2. Start each question with the prefix 'Question:' on a new line."
-        "3. Start each answer with the prefix 'Answer:' on a new line."
-        "4. For any handwritten math, transcribe it into clear, readable LaTeX format (e.g., $E = mc^2$, $\\frac{a}{b}$)."
-    )
     
     # 1. Instantiate the model.
     # Use a model that supports file inputs, like 1.5 Flash or Pro.
@@ -128,21 +116,58 @@ def transcribe_pdf_from_path(pdf_path: str, model_name: str = "gemini-2.5-flash"
     return text_output
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python gemini_pdf_transcribe_fixed.py <file.pdf>")
+    # --- UPDATED: Now requires 3 arguments ---
+    if len(sys.argv) < 3:
+        print("Usage: python transcribe.py <file.pdf> <transcription_type>")
+        print("Valid <transcription_type> options:")
+        print("  'answer' : Transcribes a handwritten Q&A answer script.")
+        print("  'rubric' : Transcribes a scoring rubric / grading guide.")
         sys.exit(1)
     
     pdf_path = sys.argv[1]
+    transcription_type = sys.argv[2].lower() # Get type and lowercase it
     
     if not os.path.exists(pdf_path):
         print(f"Error: File not found at {pdf_path}")
         sys.exit(1)
 
-    # Setup auth first
+    PROMPT_ANSWERSCRIPT = (
+        "You are an expert transcriptionist specializing in handwritten documents."
+        "Transcribe the attached PDF, which contains handwritten questions and answers."
+        "Your task is to produce a clean, plain-text version of the content."
+        "Follow these rules precisely:"
+        "1. Preserve the question and answer (Q&A) format."
+        "2. Start each question with the prefix 'Question:' on a new line."
+        "3. Start each answer with the prefix 'Answer:' on a new line."
+        "4. For any handwritten math, transcribe it into clear, readable LaTeX format (e.g., $E = mc^2$, $\\frac{a}{b}$)."
+    )
+
+    PROMPT_RUBRIC = (
+        "You are an AI assistant specializing in educational assessment."
+        "Analyze the attached PDF, which appears to be a scoring rubric or grading guide."
+        "Your task is to extract and transcribe this rubric into a clean, plain-text format."
+        "Preserve all scoring criteria, sub-criteria, and their associated point values."
+        "Structure the output logically, clearly linking criteria to their points."
+        "For example, transcribe content like '+1 if correct answer but no explanation, +2 if correct answer with some explanation'."
+    )
+
+    selected_prompt = ""
+    if transcription_type == 'answer':
+        selected_prompt = PROMPT_ANSWERSCRIPT
+        print(f"Processing '{pdf_path}' as: Answer Script")
+    elif transcription_type == 'rubric':
+        selected_prompt = PROMPT_RUBRIC
+        print(f"Processing '{pdf_path}' as: Scoring Rubric")
+    else:
+        print(f"Error: Unknown transcription type '{transcription_type}'.")
+        print("Please use 'answer' or 'rubric'.")
+        sys.exit(1)
+
+    # Setup auth
     setup_auth()
 
     print(f"Starting transcription for: {pdf_path}...")
-    result = transcribe_pdf_from_path(pdf_path)
+    result = transcribe_pdf_from_path(pdf_path, selected_prompt)
     
     print("\n" + "="*30)
     print("=== TRANSCRIPTION START ===")
@@ -160,7 +185,7 @@ if __name__ == "__main__":
             name_without_ext = os.path.splitext(base_name)[0]
             
             # Format: [UUID]_[input_filename_no_ext]_output.txt
-            output_filename = f"{unique_id}_{name_without_ext}_output.txt"
+            output_filename = f"{unique_id}_{name_without_ext}__{transcription_type}_output.txt"
             
             with open(output_filename, "w", encoding="utf-8") as f:
                 f.write(result)
