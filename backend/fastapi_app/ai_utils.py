@@ -11,10 +11,6 @@ import json
 from datetime import datetime, timezone
 import time
 import random
-import json
-from datetime import datetime, timezone
-import time
-import random
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse, unquote,urlunparse
 
@@ -389,7 +385,7 @@ def grade_submissions_for_assignment(assignment_id: str, assignment_idea: Option
                             "status": "graded",
                             "grading": grading
                         })
-                        upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "graded", grading)
+                        upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "graded", grading, assignment_id)
                         continue
                     else:
                         print(f"   ❌ Signed download failed: {signed_resp.text[:200]}")
@@ -403,12 +399,8 @@ def grade_submissions_for_assignment(assignment_id: str, assignment_idea: Option
                     "status": "download_failed",
                     "detail": "Both direct and signed URL approaches failed"
                 })
-
-                upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "failed", grading)
-                
-
-                upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "failed", grading)
-                
+                print("Upload Results starting")
+                upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "failed", grading, assignment_id)
             except Exception as e:
                 print(f"❌ Error processing submission: {e}")
                 results.append({
@@ -480,7 +472,8 @@ def upload_results(SUPABASE_URL: str,
     submission_id: str,
     user_id: str,
     processing_status: str,
-    raw_results_text: str
+    raw_results_text: str,
+    assignment_id: str
 ):
     """
     Parses a raw result text, calculates the total score, and uploads the
@@ -529,7 +522,8 @@ def upload_results(SUPABASE_URL: str,
                 "processing_status": processing_status,
                 "overall_feedback": None,
                 "result_json": None,
-                "overall_score": None
+                "overall_score": None,
+                "assignment_id": assignment_id
             }]
         else:
             if not raw_results_text:
@@ -540,8 +534,7 @@ def upload_results(SUPABASE_URL: str,
             cleaned_text = raw_results_text.strip()
             
             cleaned_text = cleaned_text.lstrip()          # remove leading spaces/newlines
-            if cleaned_text.startswith("json"):
-                cleaned_text = cleaned_text[len("json"):].lstrip()
+
             if cleaned_text.startswith("```json"):
                 cleaned_text = cleaned_text[len("```json"):].strip()
             elif cleaned_text.startswith("```"):
@@ -583,192 +576,8 @@ def upload_results(SUPABASE_URL: str,
                     "processing_status": processing_status,
                     "overall_feedback": overall_feedback,
                     "result_json": result_json_list,  # 'requests' will serialize this to JSON
-                    "overall_score": overall_score
-                }
-            ]
-
-            update_success = update_submission_status(
-                SUPABASE_URL,
-                SUPABASE_KEY,
-                submission_id,
-                "graded" # "graded" or "failed"
-            )
-        print(f"Sending data to Supabase at: {rest_url}")
-        response = requests.post(rest_url, headers=headers, data=json.dumps(payload), timeout=30)
-        response.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
-        print(f"Successfully uploaded submission! Status Code: {response.status_code}")
-        return True
-
-    except json.JSONDecodeError:
-        print(f"Error: Failed to decode 'raw_results_text'. Check if it's valid JSON.")
-        print(f"Raw text was: {raw_results_text}")
-        return False
-    except requests.exceptions.HTTPError as e:
-        print(f"Error uploading to Supabase: {e.response.status_code}")
-        print(f"Response body: {e.response.text}")
-        return False
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return False
-def generate_unique_bigint():
-    timestamp_ms = int(time.time() * 1000)  # Current time in milliseconds
-    random_part = random.randint(0, 99999)  # Add a random component
-    # Combine timestamp and random part. Ensure it fits within BIGINT limits.
-    # PostgreSQL BIGINT range: -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807
-    unique_id = (timestamp_ms * 100000) + random_part 
-    return unique_id
-
-def update_submission_status(
-    supabase_url: str,
-    supabase_key: str,
-    submission_id: str,
-    new_status: str
-) -> bool:
-    if not submission_id:
-        print("Update Status Error: submission_id is missing. Skipping update.")
-        return False
-
-    print(f"Updating status for submission_id '{submission_id}' to '{new_status}'...")
-    
-    # Use the 'eq' filter to target the specific row
-    rest_url = f"{supabase_url.rstrip('/')}/rest/v1/submissions?id=eq.{submission_id}"
-    headers = {
-        "apikey": supabase_key,
-        "Authorization": f"Bearer {supabase_key}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Prefer": "return=minimal" # Don't return the updated object
-    }
-    payload = {
-        "status": new_status
-    }
-
-    try:
-        response = requests.patch(rest_url, headers=headers, json=payload, timeout=30)
-        
-        # Check for success (2xx)
-        response.raise_for_status()
-        
-        print(f"🚦🚦🚦🚦🚦🚦Successfully updated status for submission '{submission_id}'.")
-        return True
-    
-    except requests.exceptions.HTTPError as e:
-        print(f"Error updating submission status: {e.response.status_code}")
-        print(f"Response body: {e.response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"A network error occurred: {e}")
-    
-    return False
-
-def upload_results(SUPABASE_URL: str,
-    SUPABASE_KEY: str,
-    submission_id: str,
-    user_id: str,
-    processing_status: str,
-    raw_results_text: str
-):
-    """
-    Parses a raw result text, calculates the total score, and uploads the
-    complete record to the Supabase 'submissions' table.
-
-    Args:
-        SUPABASE_URL: The base URL of your Supabase project.
-        SUPABASE_KEY: Your Supabase anon or service role key.
-        submission_id: The UUID for the submission.
-        user_id: The UUID for the user.
-        processing_status: The current status (e.g., "completed").
-        raw_results_text: A string containing the JSON results from the model.
-    """
-    
-    print("Starting results upload...")
-
-    try:
-        
-
-        # 4. Get the current time in UTC ISO format (for 'created_at')
-        created_at_time = datetime.now(timezone.utc).isoformat()
-
-        # 5. Define the Supabase REST endpoint and headers
-        # We are inserting into the 'submissions' table
-        rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/results"
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Prefer": "return=minimal" # Asks Supabase to just return 201 on success
-        }
-
-        # 6. Build the payload matching the table structure from your image
-        # We send a list containing one object to insert a single row
-        # --- NEW LOGIC BRANCH ---
-        if processing_status == "failed":
-            print("Processing a 'failed' submission. Omitting results.")
-            
-            # Set optional fields to None (for NULL in Supabase)
-            payload = [{
-                "result_id": generate_unique_bigint(),
-                "created_at": created_at_time,
-                "submission_id": submission_id,
-                "user_id": user_id,
-                "processing_status": processing_status,
-                "overall_feedback": None,
-                "result_json": None,
-                "overall_score": None
-            }]
-        else:
-            if not raw_results_text:
-                raise ValueError("Processing status is not 'failed' but raw_results_text is empty.")
-            
-            # --- NEW: Add text processing to clean the raw string ---
-            # Remove leading/trailing whitespace
-            cleaned_text = raw_results_text.strip()
-            
-            cleaned_text = cleaned_text.lstrip()          # remove leading spaces/newlines
-            if cleaned_text.startswith("json"):
-                cleaned_text = cleaned_text[len("json"):].lstrip()
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[len("```json"):].strip()
-            elif cleaned_text.startswith("```"):
-                cleaned_text = cleaned_text[len("```"):].strip()
-
-            # Remove trailing ``` if present
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3].strip()
-            
-            # Slice the string from the first '{' to the last '}' to get the JSON
-            # results_data = cleaned_text[first_brace : last_brace + 1]
-            results_data = json.loads(cleaned_text)
-            
-            # # 1. Parse the raw text blob into a Python dictionary
-            # results_data = json.loads(raw_results_text)
-
-            # 2. Extract the relevant fields from the parsed data
-            result_json_list = results_data.get("results", [])
-            overall_feedback = results_data.get("overall_feedback", "")
-
-
-            # 3. Calculate the overall_score by summing scores from the results list
-            overall_score = 0
-            for item in result_json_list:
-                # Use .get() for safety, defaulting to 0 if 'score' is missing
-                overall_score += item.get("score", 0)
-            result_id = generate_unique_bigint()
-            print(f"Calculated overall_score: {overall_score}")
-            print(f"Submission Id:{submission_id}")
-            print(f"ResultID:{result_id}")
-            print(f"User Id:{user_id}")
-
-            payload = [
-                {
-                    "created_at": created_at_time,
-                    "result_id":  result_id,
-                    "submission_id": submission_id,
-                    "user_id": user_id,
-                    "processing_status": processing_status,
-                    "overall_feedback": overall_feedback,
-                    "result_json": result_json_list,  # 'requests' will serialize this to JSON
-                    "overall_score": overall_score
+                    "overall_score": overall_score,
+                    "assignment_id": assignment_id
                 }
             ]
 
