@@ -7,7 +7,12 @@ from typing import List, Dict, Any
 import requests
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.responses import JSONResponse
-from .ai_utils import setup_auth, transcribe_pdf_from_path, grade_student_answer, grade_submissions_for_assignment
+from .ai_utils import (
+    setup_auth,
+    transcribe_pdf_from_path,
+    grade_student_answer,
+    grade_submissions_for_assignment
+)
 
 app = FastAPI(title="AI Graded Assignments API")
 
@@ -155,23 +160,11 @@ async def generate_score(rubric_file: UploadFile = File(...), answer_file: Uploa
 def read_root():
     return {"message": "FastAPI AI Graded Assignments Server is running!"}
 
-
 # ------------------------------
 # Grade all submissions for an assignment
 # ------------------------------
 @app.post("/grade/submissions")
 async def grade_submissions(payload: Dict[str, Any] = Body(...)):
-    """Grade all submissions for a given assignment.
-
-    Expects JSON body with:
-      - assignment_id: the assignment identifier used in the `submissions` table
-      - assignment_idea: a text description / rubric to use for grading
-
-    The endpoint will fetch submissions from Supabase, download each submission
-    PDF (if a public URL is present), transcribe it using the existing
-    `transcribe_pdf_from_path` helper, then call `grade_student_answer` to
-    produce grading for each submission.
-    """
     try:
         assignment_id = payload.get("assignment_id")
         assignment_idea = payload.get("assignment_idea")
@@ -179,13 +172,46 @@ async def grade_submissions(payload: Dict[str, Any] = Body(...)):
         if not assignment_id or not assignment_idea:
             raise HTTPException(status_code=400, detail="assignment_id and assignment_idea are required in the request body")
 
-        try:
-            graded = grade_submissions_for_assignment(assignment_id, assignment_idea)
-            return JSONResponse(content=graded)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        graded = grade_submissions_for_assignment(assignment_id, assignment_idea)
+        return JSONResponse(content=graded)
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ------------------------------
+# Final Grading Wrapper Endpoint
+# ------------------------------
+@app.post("/final_grading")
+async def final_grading(payload: Dict[str, Any] = Body(...)):
+    """
+    Wrapper API to grade an assignment using 'grade_submissions_for_assignment'.
+    Expects JSON body with:
+      - assignment_id: the assignment identifier
+    """
+    try:
+        assignment_id = payload.get("assignment_id")
+
+        if not assignment_id:
+            raise HTTPException(
+                status_code=400,
+                detail="assignment_id is required in the request body"
+            )
+
+        # Call existing helper function
+        graded_results = grade_submissions_for_assignment(
+            assignment_id=assignment_id
+        )
+
+        return JSONResponse(content={
+            "message": "Final grading completed successfully",
+            "graded_count": graded_results.get("count", 0),
+            "results": graded_results.get("results", [])
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

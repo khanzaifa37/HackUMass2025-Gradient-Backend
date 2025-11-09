@@ -244,186 +244,106 @@ def get_signed_url(file_path: str, supabase_url: str, supabase_key: str,
     
     return sign_url+"?token"+signed_path
 
-def grade_submissions_for_assignment(assignment_id: str, assignment_idea: Optional[str], supabase_url: Optional[str] = None, supabase_key: Optional[str] = None) -> Dict[str, Any]:
-    """Fetch submissions for an assignment from Supabase, transcribe and grade each one.
-
-    Parameters:
-      - assignment_id: ID used in the `submissions` table to filter rows.
-      - assignment_idea: rubric or assignment description text passed to grader.
-      - supabase_url/supabase_key: optional overrides for environment variables.
-
-    Returns a dict: {"count": n, "results": [...] }
+def grade_submissions_for_assignment(assignment_id: str) -> Dict[str, Any]:
+    """
+    Fetch submissions for an assignment from Supabase, transcribe, and grade each one.
+    Only requires assignment_id. Uses environment variables for Supabase URL and key.
     """
     setup_auth()
 
-    SUPABASE_URL = supabase_url or os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-    SUPABASE_KEY = supabase_key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-
+    SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+    SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     if not SUPABASE_URL or not SUPABASE_KEY:
-        raise Exception("Supabase URL or key not provided via args or environment variables")
+        raise Exception("Supabase URL or key not provided in environment variables")
 
     tmpdir = tempfile.mkdtemp(prefix="submissions_")
-    PROMPT_ANSWERSCRIPT = (
-        "You are an expert transcriptionist specializing in handwritten documents."
-        "Transcribe the attached PDF, which contains handwritten questions."
-        "Your task is to produce a clean, plain-text version of the content."
-        "Follow these rules precisely:"
-        "1. Preserve the question format."
-        "2. Start each question with the prefix 'Question:' on a new line."
-        "3. For any handwritten math, transcribe it into clear, readable LaTeX format (e.g., $E = mc^2$, $\\frac{a}{b}$)."
+
+    # Fetch assignment questions
+    questions_resp = requests.get(
+        f"{SUPABASE_URL.rstrip('/')}/rest/v1/assignments",
+        params={"select": "*", "id": f"eq.{assignment_id}"},
+        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Accept": "application/json"},
+        timeout=30
     )
-    questions_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/assignments"
-    params = {"select": "*", "id": f"eq.{assignment_id}"}
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Accept": "application/json"
-    }
-    resp = requests.get(questions_url, params=params, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        raise Exception(f"Failed to fetch questions from Supabase: {resp.status_code} {resp.text}")
-    questions = resp.json()
-    question_txt = ""
-    rubric_txt = ""
+    if questions_resp.status_code != 200:
+        raise Exception(f"Failed to fetch questions: {questions_resp.status_code} {questions_resp.text}")
+
+    questions = questions_resp.json()
+    question_txt, rubric_txt = "", ""
     for question in questions:
         try:
+            # Transcribe question
             file_url = question.get("file_url")
-            rubric_url = question.get("rubric_path")
             signed_url = get_signed_url(file_url, SUPABASE_URL, SUPABASE_KEY, "assignments")
-            print(f"   Signed URL: {signed_url}")
-            
             signed_resp = requests.get(signed_url, timeout=10)
-            print(f"   Signed response status: {signed_resp.status_code}")
-            
             if signed_resp.status_code == 200:
-                print(f"   ✅ Signed download successful!")
                 local_name = os.path.join(tmpdir, f"{uuid.uuid4()}_{os.path.basename(file_url)}")
                 with open(local_name, "wb") as f:
                     f.write(signed_resp.content)
-                
-                question_txt = transcribe_pdf_from_path(local_name, PROMPT_ANSWERSCRIPT)
-            else:
-                print(f"   ❌ Signed download failed: {signed_resp.text[:200]}")
+                question_txt = transcribe_pdf_from_path(local_name, "question")
+
+            # Transcribe rubric
+            rubric_url = question.get("rubric_path")
             signed_url = get_signed_url(rubric_url, SUPABASE_URL, SUPABASE_KEY, "rubric")
-            print(f"   Signed URL: {signed_url}")
-            
             signed_resp = requests.get(signed_url, timeout=10)
-            print(f"   Signed response status: {signed_resp.status_code}")
-            
             if signed_resp.status_code == 200:
-                print(f"   ✅ Signed download successful!")
                 local_name = os.path.join(tmpdir, f"{uuid.uuid4()}_{os.path.basename(rubric_url)}")
                 with open(local_name, "wb") as f:
                     f.write(signed_resp.content)
-                
-                rubric_txt = transcribe_pdf_from_path(local_name, PROMPT_ANSWERSCRIPT)
-            else:
-                print(f"   ❌ Signed download failed: {signed_resp.text[:200]}")
+                rubric_txt = transcribe_pdf_from_path(local_name, "rubric")
         except Exception as e:
-            print(f"   ❌ Signed URL failed: {e}")
-    rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/submissions"
-    params = {"select": "*", "assignment_id": f"eq.{assignment_id}"}
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Accept": "application/json"
-    }
-    resp = requests.get(rest_url, params=params, headers=headers, timeout=30)
-    if resp.status_code != 200:
-        raise Exception(f"Failed to fetch submissions from Supabase: {resp.status_code} {resp.text}")
+            print(f"❌ Failed to download or transcribe question/rubric: {e}")
 
-    submissions = resp.json()
+    # Fetch submissions
+    submissions_resp = requests.get(
+        f"{SUPABASE_URL.rstrip('/')}/rest/v1/submissions",
+        params={"select": "*", "assignment_id": f"eq.{assignment_id}"},
+        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Accept": "application/json"},
+        timeout=30
+    )
+    if submissions_resp.status_code != 200:
+        raise Exception(f"Failed to fetch submissions: {submissions_resp.status_code} {submissions_resp.text}")
 
-    results: List[Dict[str, Any]] = []
+    submissions = submissions_resp.json()
+    results = []
+
     PROMPT_ANSWERSCRIPT = (
         "You are an expert transcriptionist specializing in handwritten documents."
         "Transcribe the attached PDF, which contains handwritten answers."
-        "Your task is to produce a clean, plain-text version of the content."
-        "Follow these rules precisely:"
-        "1. Preserve the answer format."
-        "2. Start each answer with the prefix 'Answer:' on a new line."
-        "3. For any handwritten math, transcribe it into clear, readable LaTeX format (e.g., $E = mc^2$, $\\frac{a}{b}$)."
+        "Start each answer with 'Answer:' on a new line and convert math to LaTeX."
     )
+
     try:
         for sub in submissions:
+            submission_id = sub.get("id")
+            user_id = sub.get("user_id")
+            file_url = sub.get("file_url")
+
+            if not file_url:
+                results.append({"submission_id": submission_id, "user_id": user_id, "status": "skipped", "reason": "no file_url"})
+                continue
+
             try:
-                user_id = sub.get("user_id")
-                file_url = sub.get("file_url")
-                submission_id = sub.get("id")
-                
-                print(f"\n📄 Processing submission:")
-                print(f"   Submission ID: {submission_id}")
-                print(f"   User ID: {user_id}")
-                print(f"   Raw file_url: '{file_url}'")
-                
-                if not file_url:
-                    results.append({
-                        "submission_id": submission_id,
-                        "user_id": user_id,
-                        "status": "skipped",
-                        "reason": "no public file_url present"
-                    })
-                    continue
-
-                # Approach 2: Signed URL
-                print(f"\n🔄 Attempt 2: Signed URL")
-                try:
-                    signed_url = get_signed_url(file_url, SUPABASE_URL, SUPABASE_KEY, "submissions")
-                    print(f"   Signed URL: {signed_url}")
-                    
-                    signed_resp = requests.get(signed_url, timeout=10)
-                    print(f"   Signed response status: {signed_resp.status_code}")
-                    
-                    if signed_resp.status_code == 200:
-                        print(f"   ✅ Signed download successful!")
-                        local_name = os.path.join(tmpdir, f"{uuid.uuid4()}_{os.path.basename(file_url)}")
-                        with open(local_name, "wb") as f:
-                            f.write(signed_resp.content)
-                        
-                        student_text = transcribe_pdf_from_path(local_name, PROMPT_ANSWERSCRIPT)
-                        grading = grade_student_answer(rubric_text=rubric_txt, question_text=question_txt, student_answer=student_text)
-                        print(grading)
-                        results.append({
-                            "submission_id": submission_id,
-                            "user_id": user_id,
-                            "status": "graded",
-                            "grading": grading
-                        })
-                        upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "graded", grading)
-                        continue
-                    else:
-                        print(f"   ❌ Signed download failed: {signed_resp.text[:200]}")
-                except Exception as e:
-                    print(f"   ❌ Signed URL failed: {e}")
-
-                # If both failed
-                results.append({
-                    "submission_id": submission_id,
-                    "user_id": user_id,
-                    "status": "download_failed",
-                    "detail": "Both direct and signed URL approaches failed"
-                })
-
-                upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "failed", grading)
-                
-
-                upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "failed", grading)
-                
+                signed_url = get_signed_url(file_url, SUPABASE_URL, SUPABASE_KEY, "submissions")
+                signed_resp = requests.get(signed_url, timeout=10)
+                if signed_resp.status_code == 200:
+                    local_name = os.path.join(tmpdir, f"{uuid.uuid4()}_{os.path.basename(file_url)}")
+                    with open(local_name, "wb") as f:
+                        f.write(signed_resp.content)
+                    student_text = transcribe_pdf_from_path(local_name, PROMPT_ANSWERSCRIPT)
+                    grading = grade_student_answer(rubric_text=rubric_txt, question_text=question_txt, student_answer=student_text)
+                    results.append({"submission_id": submission_id, "user_id": user_id, "status": "graded", "grading": grading})
+                    upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "graded", grading)
+                else:
+                    results.append({"submission_id": submission_id, "user_id": user_id, "status": "download_failed"})
+                    upload_results(SUPABASE_URL, SUPABASE_KEY, submission_id, user_id, "failed", {})
             except Exception as e:
-                print(f"❌ Error processing submission: {e}")
-                results.append({
-                    "submission_id": sub.get("id"),
-                    "status": "error",
-                    "detail": str(e)
-                })
+                results.append({"submission_id": submission_id, "user_id": user_id, "status": "error", "detail": str(e)})
     finally:
-        try:
-            shutil.rmtree(tmpdir)
-        except Exception:
-            pass
-        
-        
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
     return {"count": len(results), "results": results}
+
 
 def generate_unique_bigint():
     timestamp_ms = int(time.time() * 1000)  # Current time in milliseconds
