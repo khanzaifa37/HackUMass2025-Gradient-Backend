@@ -3,6 +3,7 @@ import uuid
 import tempfile
 import shutil
 from typing import List, Dict, Any
+from fastapi.middleware.cors import CORSMiddleware
 
 import requests
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body
