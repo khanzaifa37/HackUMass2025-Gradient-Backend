@@ -16,6 +16,15 @@ from .ai_utils import (
 
 app = FastAPI(title="AI Graded Assignments API")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # Ensure output folder exists
 OUTPUT_DIR = "output_files"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
